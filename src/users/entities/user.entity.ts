@@ -44,7 +44,6 @@ export class User {
         type : "timestamptz",
         default: ()=>'CURRENT_TIMESTAMP',
     })
-
     updated_at:Date
 }
 

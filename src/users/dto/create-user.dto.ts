@@ -3,6 +3,7 @@ import { IsEmail, IsEnum, IsNotEmpty, IsString, MaxLength } from 'class-validato
 import {roles} from '../entities/user.entity';
 
 export class CreateUserDto {
+  
   @IsString()
   @IsNotEmpty()
   @MaxLength(20)
