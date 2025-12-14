@@ -4,10 +4,6 @@ import {
     PrimaryGeneratedColumn 
 } from "typeorm"
 
-export enum roles {
-  admin = "admin",
-  user = "user",
-}
 
 @Entity()
 export class User {
@@ -27,12 +23,12 @@ export class User {
     @Column({unique: true})
     email:string
 
-    @Column({
-        type:'enum',
-        enum:roles,
-        default: roles.user,
-     })
-    role:roles
+     @Column({
+        type:'boolean',
+        default:false
+    })
+    isAdmin:boolean
+
 
     @Column({
         type : "timestamptz",

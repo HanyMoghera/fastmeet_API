@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -12,8 +12,8 @@ export class UsersService {
      private readonly repo:Repository<User>){}
 
 
-  create({first_name, last_name, password, email, role}: CreateUserDto) {
-    const user = this.repo.create({first_name, last_name, password, email, role})
+  create({first_name, last_name, password, email, isAdmin}: CreateUserDto) {
+    const user = this.repo.create({first_name, last_name, password, email, isAdmin})
     return this.repo.save(user);
   }
 
@@ -21,19 +21,38 @@ export class UsersService {
     return this.repo.find({where:{email}}) 
   }
 
-  // findAll() {
-  //   return `This action returns all users`;
-  // }
+  findAll() {
+    return this.repo.find();
+  }
 
-  // findOne(id: number) {
-  //   return `This action returns a #${id} user`;
-  // }
+  findOne(id: number) {
+    return this.repo.findOne({where:{id}});
+  }
 
-  // update(id: number, updateUserDto: UpdateUserDto) {
-  //   return `This action updates a #${id} user`;
-  // }
 
-  // remove(id: number) {
-  //   return `This action removes a #${id} user`;
-  // }
+  async update(id: number, attrs: Partial<User>){
+    // get the user 
+    const user = await this.findOne(id)
+    if(!user){
+        throw new NotFoundException('User not found!')
+    }
+    // check the changes in the old user and the new one and assign the new in the old one 
+    Object.assign(user, attrs)
+    // save the new data to the database 
+    return this.repo.save(user)
+    
+}
+
+
+  async remove(id: number){
+        // get the user 
+      const user = await this.findOne(id)
+
+    if(!user){
+          throw new NotFoundException('User not found!')
+      }
+      // save the Entity with the deleted user 
+      return this.repo.remove(user)
+
+  }
 }

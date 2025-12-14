@@ -1,29 +1,24 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from './entities/user.entity';
 import { AuthService } from './auth.service';
-import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { CurrentUserMiddleware } from './middlewares/current-user.middleware';
+
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([User]),
-    ConfigModule.forRoot({envFilePath: '.env'}),
-    
-    JwtModule.registerAsync({
-      global: true,
-      imports: [ConfigModule],
-      inject: [ConfigService],
-
-      useFactory: (config: ConfigService)=>({  
-       secret:config.get('JWT_SECRET'),
-       signOptions: {expiresIn: (config.get<number>('JWT_EXPIRE_IN'))}
-      })
-    })
+    ConfigModule,
   ],
   controllers: [UsersController],
-  providers: [UsersService, AuthService,ConfigService ],
+  providers: [UsersService, AuthService],
+  exports: [UsersService],
 })
-export class UsersModule {}
+export class UsersModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(CurrentUserMiddleware).forRoutes('*');
+  }
+}

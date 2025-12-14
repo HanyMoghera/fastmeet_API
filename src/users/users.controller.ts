@@ -1,63 +1,103 @@
 import {
-   Controller, 
-   Get,
-    Post,
-     Body,
-      Patch, 
-       Param, 
-         Delete 
-        } from '@nestjs/common';
+  Controller,
+  Post,
+  Body,
+  Session,
+  Get,
+  UseGuards,
+  Patch,
+  Param,
+  ParseIntPipe,
+  Delete
+} from '@nestjs/common';
 
-import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
+import { LoginUserDto } from './dto/Login-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { AuthService } from './auth.service';
-import { LoginUserDto } from './dto/Login-user.dto';
-
+import { CurrentUser } from 'src/decorators/current-user.decorator';
+import { User } from './entities/user.entity';
+import { AuthGuard } from 'src/guards/auth.guard';
+import { AdminGuard } from 'src/guards/admin.guard';
+import { UsersService } from './users.service';
 @Controller('auth')
 export class UsersController {
   constructor(
-    private readonly usersService: UsersService, 
-    private readonly authService: AuthService
+    private readonly authService: AuthService,
+    private readonly userService: UsersService
   ) {}
 
+  @Post('/signup')
+  async signup(
+    @Session() session: any,
+    @Body() body: CreateUserDto,
+  ) {
+    const user = await this.authService.signup(
+      body.first_name,
+      body.last_name,
+      body.email,
+      body.password,
+      body.isAdmin,
+    );
+      
+    session.userId = user.id; 
 
-  @Post()
-  async create(@Body() createUserDto: CreateUserDto) {
-    return await this.usersService.create(createUserDto);
+    return user;
   }
 
-  @Post('/signup')
-    async signup(@Body() body:CreateUserDto){
-      const user = await this.authService.signup(body.first_name, body.last_name, body.email, body.password,body.role);
-      return user;
-    }
+  @Post('/signin')
+  async signin(
+    @Session() session: any,
+    @Body() body: LoginUserDto,
+  ) {
+    const user = await this.authService.signin(
+      body.email,
+      body.password,
+    );
 
+    session.userId = user.id; 
 
-    @Post('/signin')
-    async signin(@Body() body:LoginUserDto){
-    const user  = await this.authService.signin(body.email, body.password)
     return user;
+  }
+
+  @Post('/signout')
+    signout(@Session() session: any){
+        session.userId = null;
     }
+ 
 
-  // @Get()
-  // findAll() {
-  //   return this.usersService.findAll();
-  // }
 
-  // @Get(':id')
-  // findOne(@Param('id') id: string) {
-  //   return this.usersService.findOne(+id);
-  // }
+    // get user info
+  @UseGuards(AuthGuard)
+  @Get('/me')
+  whoAmI(@CurrentUser() user: User){
+      return user; 
+  }
 
-  // @Patch(':id')
-  // update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
-  //   return this.usersService.update(+id, updateUserDto);
-  // }
-
-  // @Delete(':id')
-  // remove(@Param('id') id: string) {
-  //   return this.usersService.remove(+id);
-  // }
   
+  // get all users 
+  @UseGuards(AdminGuard)
+  @Get('/findAll')
+  async findAll(){
+    const users = await this.userService.findAll();
+    return users;
+  }
+
+  // update a user for admin 
+  @UseGuards(AdminGuard)
+  @Patch('/:id')
+    updateUser(
+      @Param('id', ParseIntPipe) id: number,
+      @Body() body: UpdateUserDto
+  ){
+    return this.userService.update(id, body); 
+  }
+
+
+  // delete a user 
+  @Delete('/:id')
+  removeUser(@Param('id') id: string){
+      return this.userService.remove(parseInt(id));  
+  }
+
 }
