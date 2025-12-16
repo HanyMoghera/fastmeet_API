@@ -10,7 +10,6 @@ import {
   ParseIntPipe,
   Delete
 } from '@nestjs/common';
-
 import { CreateUserDto } from './dto/create-user.dto';
 import { LoginUserDto } from './dto/Login-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -20,6 +19,9 @@ import { User } from './entities/user.entity';
 import { AuthGuard } from 'src/guards/auth.guard';
 import { AdminGuard } from 'src/guards/admin.guard';
 import { UsersService } from './users.service';
+import { Serialize } from 'src/interceptors/serialization.interceptor';
+import { UserDto } from './dto/user.dto';
+
 @Controller('auth')
 export class UsersController {
   constructor(
@@ -67,7 +69,8 @@ export class UsersController {
  
 
 
-    // get user info
+  // get user info
+  @Serialize(UserDto)
   @UseGuards(AuthGuard)
   @Get('/me')
   whoAmI(@CurrentUser() user: User){
@@ -76,6 +79,7 @@ export class UsersController {
 
   
   // get all users 
+  @Serialize(UserDto)
   @UseGuards(AdminGuard)
   @Get('/findAll')
   async findAll(){

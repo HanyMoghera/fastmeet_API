@@ -18,8 +18,8 @@ export class RoomsController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.roomsService.findOne(+id);
+  find_one(@Param('id') id: string) {
+    return this.roomsService.find_one(+id);
   }
 
   @Patch(':id')

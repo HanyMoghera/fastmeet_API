@@ -23,8 +23,8 @@ export class AuthService {
     password: string,
     isAdmin: boolean
   ) {
-    const [existingUser] = await this.userService.find(email);
-    if (existingUser) {
+    const existingUser = await this.userService.find(email);
+    if (existingUser.length) {
       throw new BadRequestException('Email in use!');
     }
 

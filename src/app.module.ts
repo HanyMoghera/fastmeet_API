@@ -2,6 +2,7 @@ import {
   MiddlewareConsumer,
   Module,
   NestModule,
+  ValidationPipe,
 } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -13,6 +14,9 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UsersModule } from './users/users.module';
 import { RoomsModule } from './rooms/rooms.module';
+import { APP_PIPE } from '@nestjs/core';
+import { AmenitiesModule } from './amenities/amenities.module';
+import { WorkingHoursModule } from './working_hours/working_hours.module';
 
 @Module({
   imports: [
@@ -38,10 +42,24 @@ import { RoomsModule } from './rooms/rooms.module';
 
     UsersModule,
     RoomsModule,
+    AmenitiesModule,
+    WorkingHoursModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService,
+    {
+      // to be able to apply and validations in DTos
+      provide: APP_PIPE,
+      useValue: new ValidationPipe({
+      whitelist: true,
+      transform: true,
+      }),
+    }
+
+  ],
 })
+
+
 export class AppModule implements NestModule {
   constructor(private readonly configService: ConfigService) {}
 
