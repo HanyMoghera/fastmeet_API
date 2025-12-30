@@ -35,8 +35,6 @@ export class WorkingHour{
     @Column()
     end_time:string;
 
-    @Column({type: 'date'})
-    date: Date
 
     @ManyToOne(()=>Room, (room)=>room.working_hours,
     {onDelete: 'CASCADE'})

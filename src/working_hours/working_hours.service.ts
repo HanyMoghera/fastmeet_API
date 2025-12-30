@@ -14,13 +14,12 @@ export class WorkingHoursService {
   ){}
 
  create(createWorkingHourDto:CreateWorkingHourDto) {
-    const {weekday, start_time, end_time, room, date} = createWorkingHourDto;
+    const {weekday, start_time, end_time, room} = createWorkingHourDto;
     const workingHours = this.repo.create({
       weekday,
        start_time, 
          end_time,
-           room,
-           date
+           room
         });
     return this.repo.save(workingHours);
   }

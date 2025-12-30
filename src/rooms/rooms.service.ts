@@ -92,6 +92,7 @@ export class RoomsService {
    if(!room){
       throw new NotFoundException(`there is no room with this ID: ${id}`);
     }
+
     return room;
   }
 
@@ -163,7 +164,6 @@ async remove(id: number): Promise<void> {
   // remove the room
   await this.roomRepo.remove(room);
 }
-
 
 
 

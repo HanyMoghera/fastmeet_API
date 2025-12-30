@@ -12,8 +12,6 @@ export class CreateWorkingHourDto {
     @IsString()
     end_time: string; 
 
-    @IsString()
-    date: string
 
     room: Room;
 
