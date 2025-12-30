@@ -45,9 +45,9 @@ export class Room {
     // define the relationship between
     @ManyToMany(()=> Amentity, (amentity)=> amentity.rooms , { cascade: true })
     @JoinTable()
-    amenities: Amentity[]
+    amenities: Amentity[] // it is a list of the ids to reference to the amentity objet in the other schema. 
 
-    @OneToMany(()=>WorkingHour, (working_hours)=>working_hours.room)
-    working_hours:WorkingHour[];
+    @OneToMany(()=>WorkingHour, (working_hours)=> working_hours.room)
+    working_hours:WorkingHour[]; // list of a lists 
 
 }

@@ -38,7 +38,8 @@ export class WorkingHour{
     @Column({type: 'date'})
     date: Date
 
-    @ManyToOne(()=>Room, (room)=>room.working_hours)
+    @ManyToOne(()=>Room, (room)=>room.working_hours,
+    {onDelete: 'CASCADE'})
     room:Room;
 
 }

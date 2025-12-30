@@ -1,4 +1,4 @@
-import { IsString, IsEnum, IsNumber, IsDate } from 'class-validator';
+import { IsString, IsEnum, IsNumber, IsDate, IsArray, IsOptional } from 'class-validator';
 import { Weekday }from '../entities/working_hour.entity'
 import { Room } from 'src/rooms/entities/room.entity';
 
@@ -12,10 +12,11 @@ export class CreateWorkingHourDto {
     @IsString()
     end_time: string; 
 
-    @IsNumber()
-    roomId: number;
-
     @IsString()
     date: string
+
+    room: Room;
+
+
 
 }

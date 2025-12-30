@@ -2,6 +2,8 @@ import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/commo
 import { WorkingHoursService } from './working_hours.service';
 import { CreateWorkingHourDto } from './dto/create-working_hour.dto';
 import { UpdateWorkingHourDto } from './dto/update-working_hour.dto';
+import { Serialize } from 'src/interceptors/serialization.interceptor';
+
 
 @Controller('working-hours')
 export class WorkingHoursController {

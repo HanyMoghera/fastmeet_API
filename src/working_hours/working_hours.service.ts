@@ -14,19 +14,22 @@ export class WorkingHoursService {
   ){}
 
  create(createWorkingHourDto:CreateWorkingHourDto) {
-    const {weekday, start_time, end_time, roomId, date} = createWorkingHourDto;
+    const {weekday, start_time, end_time, room, date} = createWorkingHourDto;
     const workingHours = this.repo.create({
       weekday,
        start_time, 
          end_time,
-           room: {id:roomId},
+           room,
            date
         });
     return this.repo.save(workingHours);
   }
 
-  findAll() {
-    return this.repo.find();
+  async findAll() {
+    const workingHours = await this.repo.find();
+    const count = workingHours.length;
+
+    return [count, workingHours]
   }
 
  async find_one(id: number) {
@@ -38,7 +41,7 @@ export class WorkingHoursService {
   }
 
 
-    async  update(id: number, updateWorkingHourDto: UpdateWorkingHourDto) {
+  async  update(id: number, updateWorkingHourDto: UpdateWorkingHourDto) {
 
     // get the entity 
      const workingHours = await this.find_one(id);
@@ -66,8 +69,6 @@ export class WorkingHoursService {
       }
     return this.repo.remove(workingHours);
   }
-
-  find(){}
 }
 
 

@@ -2,11 +2,16 @@ import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/commo
 import { RoomsService } from './rooms.service';
 import { CreateRoomDto } from './dto/create-room.dto';
 import { UpdateRoomDto } from './dto/update-room.dto';
+import { Serialize } from 'src/interceptors/serialization.interceptor';
+import { RoomResponseDto } from './dto/room.dto';
+
 
 @Controller('rooms')
 export class RoomsController {
   constructor(private readonly roomsService: RoomsService) {}
 
+
+  @Serialize(RoomResponseDto)
   @Post()
   create(@Body() createRoomDto: CreateRoomDto) {
     return this.roomsService.create(createRoomDto);
@@ -22,6 +27,7 @@ export class RoomsController {
     return this.roomsService.find_one(+id);
   }
 
+  @Serialize(RoomResponseDto)
   @Patch(':id')
   update(@Param('id') id: string, @Body() updateRoomDto: UpdateRoomDto) {
     return this.roomsService.update(+id, updateRoomDto);
@@ -31,4 +37,5 @@ export class RoomsController {
   remove(@Param('id') id: string) {
     return this.roomsService.remove(+id);
   }
+
 }

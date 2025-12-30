@@ -28,7 +28,8 @@ export class UsersController {
     private readonly authService: AuthService,
     private readonly userService: UsersService
   ) {}
-
+  
+  @Serialize(UserDto)
   @Post('/signup')
   async signup(
     @Session() session: any,
@@ -46,7 +47,7 @@ export class UsersController {
 
     return user;
   }
-
+  @Serialize(UserDto)
   @Post('/signin')
   async signin(
     @Session() session: any,
