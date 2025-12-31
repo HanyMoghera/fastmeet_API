@@ -13,20 +13,21 @@ export class BookingService {
   constructor(
     @InjectRepository(Booking)
     private readonly bookingRepo: Repository<Booking>,
+    @InjectRepository(Room)
     private readonly roomRepo: Repository<Room>
   ){}
 
 
 async  create(createBookingDto: CreateBookingDto ,currentUser: User){
 
-  // get the input
-  const {
-    start_time,
-    end_time,
-    promo_code,
-    date,
-    roomId
-  } = createBookingDto
+  // // get the input
+  // const {
+  //   start_time,
+  //   end_time,
+  //   promo_code,
+  //   date,
+  //   roomId
+  // } = createBookingDto
 
 
   // check if there is a room with this ID 

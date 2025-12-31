@@ -19,6 +19,7 @@ import { AmenitiesModule } from './amenities/amenities.module';
 import { WorkingHoursModule } from './working_hours/working_hours.module';
 import { HolidaysModule } from './holidays/holidays.module';
 import { BookingModule } from './booking/booking.module';
+import { PromocodeModule } from './promocode/promocode.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { BookingModule } from './booking/booking.module';
     WorkingHoursModule,
     HolidaysModule,
     BookingModule,
+    PromocodeModule,
   ],
   controllers: [AppController],
   providers: [AppService,
