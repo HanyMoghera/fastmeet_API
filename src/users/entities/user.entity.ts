@@ -1,6 +1,8 @@
+import { Booking } from "src/booking/entities/booking.entity";
 import {
     Column,
     Entity,
+    ManyToOne,
     PrimaryGeneratedColumn 
 } from "typeorm"
 
@@ -41,6 +43,9 @@ export class User {
         default: ()=>'CURRENT_TIMESTAMP',
     })
     updated_at:Date
+
+    @ManyToOne(()=> Booking, (bookings)=> bookings.user)
+    bookings:Booking
 }
 
 

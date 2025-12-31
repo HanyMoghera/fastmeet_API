@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { CreateRoomDto } from './dto/create-room.dto';
 import { UpdateRoomDto } from './dto/update-room.dto';
 import { In, Repository } from 'typeorm';
@@ -6,12 +6,13 @@ import { Room } from './entities/room.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Amentity } from 'src/amenities/entities/amenity.entity';
 import { WorkingHour } from 'src/working_hours/entities/working_hour.entity';
-
+import type { Cache } from 'cache-manager';
 
 @Injectable()
 export class RoomsService {
 
   constructor(
+
     @InjectRepository(Room)
     private readonly roomRepo: Repository <Room>,
 
@@ -20,6 +21,8 @@ export class RoomsService {
 
     @InjectRepository(WorkingHour)
     private readonly whRepo: Repository <WorkingHour>,
+
+
   ){}
 
   
@@ -164,7 +167,5 @@ async remove(id: number): Promise<void> {
   // remove the room
   await this.roomRepo.remove(room);
 }
-
-
 
 }

@@ -1,0 +1,58 @@
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  CreateDateColumn,
+  UpdateDateColumn,
+} from 'typeorm';
+
+import { Room } from '../../rooms/entities/room.entity';
+import { User } from '../../users/entities/user.entity';
+
+export enum BookingStatus {
+  PENDING = 'pending',
+  CONFIRMED = 'confirmed',
+  CANCELLED = 'cancelled',
+}
+
+@Entity('bookings')
+export class Booking {
+  @PrimaryGeneratedColumn()
+  id: number;
+
+ @Column('time')
+    start_time: string;
+
+  @Column('time')
+    end_time: string;
+
+  @Column({
+    type: 'enum',
+    enum: BookingStatus,
+    default: BookingStatus.PENDING,
+  })
+  status: BookingStatus;
+
+  @Column('decimal', { precision: 10, scale: 2 })
+  price: number;
+
+  @Column({ type: 'varchar', nullable: true })
+  promo_code: string;
+
+  @CreateDateColumn()
+  created_at: Date;
+
+  @UpdateDateColumn()
+  updated_at: Date;
+
+  @Column('date')
+  date: string;
+
+  @ManyToOne(() => Room, (room) => room.bookings, { nullable: false })
+  room: Room;
+
+  @ManyToOne(() => User, (user) => user.bookings, { nullable: false })
+  user: User;
+
+}

@@ -18,6 +18,7 @@ import { APP_PIPE } from '@nestjs/core';
 import { AmenitiesModule } from './amenities/amenities.module';
 import { WorkingHoursModule } from './working_hours/working_hours.module';
 import { HolidaysModule } from './holidays/holidays.module';
+import { BookingModule } from './booking/booking.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { HolidaysModule } from './holidays/holidays.module';
     AmenitiesModule,
     WorkingHoursModule,
     HolidaysModule,
+    BookingModule,
   ],
   controllers: [AppController],
   providers: [AppService,
