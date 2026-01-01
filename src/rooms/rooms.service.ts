@@ -6,7 +6,8 @@ import { Room } from './entities/room.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Amentity } from 'src/amenities/entities/amenity.entity';
 import { WorkingHour } from 'src/working_hours/entities/working_hour.entity';
-import type { Cache } from 'cache-manager';
+import { WorkingHoursService } from 'src/working_hours/working_hours.service';
+import { CreateWorkingHourDto, CreateWorkingHoursDto, WorkingHourItemDto } from 'src/working_hours/dto/create-working_hour.dto';
 
 @Injectable()
 export class RoomsService {
@@ -22,82 +23,95 @@ export class RoomsService {
     @InjectRepository(WorkingHour)
     private readonly whRepo: Repository <WorkingHour>,
 
+    private readonly workingHoursService:WorkingHoursService
+
 
   ){}
-
   
-  // create a room 
-  async create(createRoomDto: CreateRoomDto): Promise<Room> {
+// create a room
+async create(createRoomDto: CreateRoomDto): Promise<Room> {
 
-    // get the input data
-    const {
-      name,
-      capacity,
-       is_active,
-        amenities, 
-         timezone,
-          working_hours
-         }= createRoomDto;
+  const {
+    name,
+    capacity,
+    is_active,
+    amenities,
+    timezone,
+    working_hours,
+  } = createRoomDto;
 
-// create the room without the amentities and the working hours
-    const room = this.roomRepo.create ({
-       name,
-        capacity, 
-          is_active,
-            timezone,
-            });
+  // create room (without relations)
+  const room = this.roomRepo.create({
+    name,
+    capacity,
+    is_active,
+    timezone,
+  });
 
-// attach the amentities (ids) if existis in the futute 
-            if(amenities?.length){
-              // check if these amentities exist
-              const amentities = await this.amentityRepo.find({
-                where: {id: In(amenities)},
-              });
+  // attach amenities if exist
+  if (amenities?.length) {
+    const foundAmenities = await this.amentityRepo.find({
+      where: { id: In(amenities) },
+    });
 
-              if(amentities.length !== amenities.length){
-                throw new NotFoundException('One or more amentities not found!')
-              }
-                 room.amenities= amentities;      
-            }
-      
-          // save the room 
-      const savedRoom = await this.roomRepo.save(room);
-
-
- // create working hours
-    if (working_hours?.length) {
-      const workingHours = working_hours.map((wh) =>
-        this.whRepo.create({
-          ...wh,
-          room: savedRoom,
-        }),
-      );
-
-      await this.whRepo.save(workingHours);
-      savedRoom.working_hours = workingHours as WorkingHour[];
+    if (foundAmenities.length !== amenities.length) {
+      throw new NotFoundException('One or more amenities not found!');
     }
 
-    return savedRoom;
-      
+    room.amenities = foundAmenities;
   }
 
-  findAll() {
-    return this.roomRepo.find();
+  // save room first
+  const savedRoom = await this.roomRepo.save(room);
+
+  // create working hours (single or multiple)
+  if (working_hours !== undefined) {
+    const roomId = savedRoom.id;
+
+    let workingHoursObject: CreateWorkingHourDto | CreateWorkingHoursDto;
+
+    if (Array.isArray(working_hours)) {
+      // multiple working hours
+      workingHoursObject = {
+        roomId,
+        working_hours,
+      };
+    } else {
+      // single working hour
+      const { date, weekday, start_time, end_time } = working_hours;
+      workingHoursObject = {
+        roomId,
+        date,
+        weekday,
+        start_time,
+        end_time,
+      };
+    }
+
+    const workingHours =
+      await this.workingHoursService.create(workingHoursObject);
+
+    savedRoom.working_hours = workingHours;
   }
 
-  async find_one(id: number) {
+  return savedRoom;
+}
 
-  const room = await this.roomRepo.findOne({
-  where: { id },
-  relations: ['working_hours'],
+
+findAll() {
+  return this.roomRepo.find({relations: ['working_hours']});
+}
+// find a room 
+async find_one(id: number) {
+const room = await this.roomRepo.findOne({
+where: { id },
+relations: ['working_hours'],
 });
-
-   if(!room){
-      throw new NotFoundException(`there is no room with this ID: ${id}`);
-    }
-
-    return room;
+  if(!room){
+    throw new NotFoundException(`there is no room with this ID: ${id}`);
   }
+  return room;
+}
 
 // update a room
 async update(id: number, updateRoomDto: UpdateRoomDto): Promise<Room> {
@@ -136,6 +150,7 @@ async update(id: number, updateRoomDto: UpdateRoomDto): Promise<Room> {
   // save the updated room first to keep relations consistent
   const savedRoom = await this.roomRepo.save(room);
 
+
   // update working hours if provided
   if (working_hours?.length) {
     // delete old working hours
@@ -149,10 +164,9 @@ async update(id: number, updateRoomDto: UpdateRoomDto): Promise<Room> {
       await this.whRepo.save(newWorkingHours);
       savedRoom.working_hours = newWorkingHours as WorkingHour[];
   }
-
+  
   return savedRoom;
 }
-
 
 async remove(id: number): Promise<void> {
   // find the room first
@@ -167,5 +181,20 @@ async remove(id: number): Promise<void> {
   // remove the room
   await this.roomRepo.remove(room);
 }
+
+  async getAvailability(id: number , data: string){
+
+    // check if the room exists and is active and also get the working hours attached with this room.  
+    const roomAndWorkingHours = await this.find_one(id);
+
+    // Returns working hours
+   const workingHours=  roomAndWorkingHours.working_hours;
+      if(!workingHours?.length){
+        throw new NotFoundException('Sorry, there is no Working hourse for this room! ')
+      }
+    // available slots
+    //  blocked slots 
+    return workingHours; 
+  }
 
 }

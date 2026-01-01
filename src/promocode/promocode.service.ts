@@ -12,6 +12,7 @@ export class PromocodeService {
     @InjectRepository(Promocode)
     private readonly repo: Repository<Promocode>
   ){}
+  
  async create(createPromocodeDto: CreatePromocodeDto) {
 
   // get user input data

@@ -14,4 +14,7 @@ export class WorkingHoursResponseDto {
   @Expose()
   end_time: string;
 
+  @Expose()
+  date:string
+
 }

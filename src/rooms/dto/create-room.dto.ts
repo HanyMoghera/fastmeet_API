@@ -1,6 +1,6 @@
 import { IsString, IsNumber, IsBoolean, IsOptional, IsArray, ValidateNested, IsEnum } from 'class-validator';
 import { Type } from 'class-transformer';
-import { CreateWorkingHourDto } from '../../working_hours/dto/create-working_hour.dto';
+import {WorkingHourItemDto } from '../../working_hours/dto/create-working_hour.dto';
 
 export class CreateRoomDto {
     @IsString()
@@ -25,8 +25,8 @@ export class CreateRoomDto {
     @IsArray()
     @IsOptional()
     @ValidateNested({ each: true })
-    @Type(() => CreateWorkingHourDto)
-    working_hours?: CreateWorkingHourDto[];
+    @Type(() => WorkingHourItemDto)
+    working_hours?: WorkingHourItemDto[];
 
 }
 
