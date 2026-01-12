@@ -11,7 +11,7 @@ export class Holiday {
     day: Weekday
 
     @Column({unique: true})
-    date: Date
+    date: string
 
     @CreateDateColumn()
     created_at: Date;

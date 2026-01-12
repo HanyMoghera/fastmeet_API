@@ -1,6 +1,7 @@
 import { IsEnum, IsNotEmpty, IsOptional, IsString, IsNumber, IsDateString } from 'class-validator';
 import { BookingStatus } from '../entities/booking.entity';
 import { Room } from 'src/rooms/entities/room.entity';
+import { Weekday } from 'src/working_hours/entities/working_hour.entity';
 
 export class CreateBookingDto {
 
@@ -23,5 +24,9 @@ export class CreateBookingDto {
   @IsNotEmpty()
   @IsNumber()
   roomId: Number; 
+
+  @IsNotEmpty()
+  @IsString()
+  weekday:Weekday
 
 }

@@ -9,6 +9,7 @@ import {
 
 import { Room } from '../../rooms/entities/room.entity';
 import { User } from '../../users/entities/user.entity';
+import { Weekday } from 'src/working_hours/entities/working_hour.entity';
 
 export enum BookingStatus {
   PENDING = 'pending',
@@ -48,6 +49,9 @@ export class Booking {
 
   @Column('date')
   date: string;
+
+  @Column()
+  weekday:Weekday;
 
   @ManyToOne(() => Room, (room) => room.bookings, { nullable: false })
   room: Room;

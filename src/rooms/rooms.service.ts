@@ -182,19 +182,52 @@ async remove(id: number): Promise<void> {
   await this.roomRepo.remove(room);
 }
 
-  async getAvailability(id: number , data: string){
 
-    // check if the room exists and is active and also get the working hours attached with this room.  
-    const roomAndWorkingHours = await this.find_one(id);
+// this function will be used to get the aviable slots for a dat in a certain date! 
+async slotGeneration(workingHours: WorkingHour[], roomId:number){
 
-    // Returns working hours
-   const workingHours=  roomAndWorkingHours.working_hours;
-      if(!workingHours?.length){
-        throw new NotFoundException('Sorry, there is no Working hourse for this room! ')
-      }
-    // available slots
-    //  blocked slots 
-    return workingHours; 
+// 1- get the booking for this room in that day
+
+// 2- generate the availiable slots from the reservide slots and the availiable one from the working hours
+
+// 3- return the values. 
+
+const slots =  workingHours.map((val)=>{
+  return {
+    start_time: val.start_time ,
+    end_time:val.end_time
   }
+}
+);
+
+return slots;
+}
+
+async getAvailability(id: number, date: string) {
+
+  const room = await this.roomRepo.findOne({ where: { id } });
+  if (!room) {
+    throw new NotFoundException(`Room with ID ${id} not found`);
+  }
+
+  // get the working hours. 
+  const workingHours = await this.whRepo.find({
+    where: {
+      room: { id: room.id },
+      date: date,
+    },
+    select: ['weekday', 'start_time', 'end_time', 'date'],
+  });
+
+  if (!workingHours.length) {
+    throw new NotFoundException(`No working hours found for date: ${date}`);
+  }
+
+  const slotsGeneration= await this.slotGeneration(workingHours, id); 
+
+  return slotsGeneration;
+}
+
+
 
 }

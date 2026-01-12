@@ -12,5 +12,6 @@ import { Holiday } from './entities/holiday.entity';
     ],
   controllers: [HolidaysController],
   providers: [HolidaysService],
+  exports:[HolidaysService]
 })
 export class HolidaysModule {}

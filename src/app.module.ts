@@ -20,6 +20,7 @@ import { WorkingHoursModule } from './working_hours/working_hours.module';
 import { HolidaysModule } from './holidays/holidays.module';
 import { BookingModule } from './booking/booking.module';
 import { PromocodeModule } from './promocode/promocode.module';
+import { SettingsModule } from './settings/settings.module';
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { PromocodeModule } from './promocode/promocode.module';
     HolidaysModule,
     BookingModule,
     PromocodeModule,
+    SettingsModule,
   ],
   controllers: [AppController],
   providers: [AppService,
@@ -64,7 +66,6 @@ import { PromocodeModule } from './promocode/promocode.module';
 
   ],
 })
-
 
 export class AppModule implements NestModule {
   constructor(private readonly configService: ConfigService) {}
