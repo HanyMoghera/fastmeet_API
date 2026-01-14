@@ -10,5 +10,6 @@ import { Promocode } from './entities/promocode.entity';
   ],
   controllers: [PromocodeController],
   providers: [PromocodeService],
+  exports: [PromocodeService]
 })
 export class PromocodeModule {}

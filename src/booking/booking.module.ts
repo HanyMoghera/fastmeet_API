@@ -8,12 +8,15 @@ import { Room } from 'src/rooms/entities/room.entity';
 import { SettingsModule } from 'src/settings/settings.module';
 import { HolidaysService } from 'src/holidays/holidays.service';
 import { HolidaysModule } from 'src/holidays/holidays.module';
+import { PromocodeModule } from 'src/promocode/promocode.module';
+import { Promocode } from 'src/promocode/entities/promocode.entity';
 
 @Module({
   imports:[
-    TypeOrmModule.forFeature([Booking, User, Room]),
+    TypeOrmModule.forFeature([Booking, User, Room, Promocode]),
     SettingsModule,
-    HolidaysModule
+    HolidaysModule,
+    PromocodeModule
   ],
   controllers: [BookingController],
   providers: [BookingService],

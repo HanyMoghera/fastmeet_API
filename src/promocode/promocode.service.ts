@@ -58,16 +58,17 @@ if(!promocode){
   }
 
 
-  async findOne(id: number) {
-    const promocode = await this.repo.findOne({where: {id}});
+  async findOne(code: string) {
+    const promocode = await this.repo.findOne({where: {code}});
     if(!promocode){
-      throw new NotFoundException(`There is no Promocode with this ID: ${id} exists :(` )
+      throw new NotFoundException(`There is no code :: ${code} does not exists :(` )
     }
     return promocode;
   }
 
+
   async update(id: number, updatePromocodeDto: UpdatePromocodeDto) {
-    const promocode = await this.findOne(id);
+    const promocode =await this.repo.findOne({where:{id}});
     if(!promocode){
       throw new NotFoundException(`There is no Promocode with this ID: ${id} exists :(` )
     }
@@ -78,7 +79,7 @@ if(!promocode){
 
 
  async remove(id: number) {
-     const promocode = await this.findOne(id);
+    const promocode =await this.repo.findOne({where:{id}});
     if(!promocode){
       throw new NotFoundException(`There is no Promocode with this ID: ${id} exists :(` )
     }

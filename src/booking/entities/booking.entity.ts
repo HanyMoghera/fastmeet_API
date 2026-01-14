@@ -41,12 +41,6 @@ export class Booking {
   @Column({ type: 'varchar', nullable: true })
   promo_code: string;
 
-  @CreateDateColumn()
-  created_at: Date;
-
-  @UpdateDateColumn()
-  updated_at: Date;
-
   @Column('date')
   date: string;
 
@@ -59,4 +53,10 @@ export class Booking {
   @ManyToOne(() => User, (user) => user.bookings, { nullable: false })
   user: User;
 
+
+  @CreateDateColumn()
+  created_at: Date;
+
+  @UpdateDateColumn()
+  updated_at: Date;
 }

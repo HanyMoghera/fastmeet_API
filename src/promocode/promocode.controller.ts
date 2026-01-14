@@ -18,8 +18,8 @@ export class PromocodeController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.promocodeService.findOne(+id);
+  findOne(@Param('promocode') code: string) {
+    return this.promocodeService.findOne(code);
   }
 
   @Patch(':id')

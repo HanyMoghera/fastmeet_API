@@ -2,13 +2,14 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { UpdateBookingDto } from './dto/update-booking.dto';
 import { User } from 'src/users/entities/user.entity';
-import { Repository } from 'typeorm';
-import { Booking } from './entities/booking.entity';
+import { LessThanOrEqual, MoreThanOrEqual, Repository } from 'typeorm';
+import { Booking, BookingStatus } from './entities/booking.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Room } from 'src/rooms/entities/room.entity';
 import { SettingsService } from 'src/settings/settings.service';
 import { HolidaysService } from 'src/holidays/holidays.service';
-import { error } from 'console';
+import { Promocode } from 'src/promocode/entities/promocode.entity';
+import { PromocodeService } from 'src/promocode/promocode.service';
 
 @Injectable()
 export class BookingService {
@@ -20,14 +21,24 @@ export class BookingService {
     @InjectRepository(Room)
     private readonly roomRepo: Repository<Room>, 
 
+    @InjectRepository(Promocode)
+    private readonly promocodeRepo: Repository<Promocode>, 
+
     private readonly settingsService: SettingsService,
 
-    private readonly holidayService: HolidaysService
+    private readonly holidayService: HolidaysService,
+
+    private readonly promocodeService: PromocodeService,
+
 
   ){}
 
 
 async  create(createBookingDto: CreateBookingDto ,currentUser: User){
+
+  if(!currentUser){
+    throw new BadRequestException('Please login first to be alble to book a room!')
+  }
 
   // get the input
   const {
@@ -81,7 +92,7 @@ if (!(duration >= 30 && duration <= 240)) {
 console.log("pass the duration!")
 
 // check the number of the booking per user! 
-this.getUserBookings(currentUser, date);
+await this.getUserBookings(currentUser, date);
 
 // cehck the hollydays first! 
 const holidays = await this.holidayService.findAll();
@@ -114,35 +125,80 @@ if(bookingsForaDay.length){
 }
 console.log('checking the overlaps passed!'); 
 
-  //get the promocode if exists + validateand update it 
+
+  //Promocodes 
+  // get the promocode and check the validity "date"
 
   // caculate the room price 
 
-  // update the satuts 
+  let roomPrice:number = await this.settingsService.getHourlyPrice('hour_price_global');
+
+  if(!roomPrice){
+      throw new BadRequestException('Sorry, there is no room price at the moment!')
+  }
+
+
+const promo = await this.promocodeRepo.findOne({
+  where: {
+    code:promo_code,
+    valid_from: LessThanOrEqual(new Date()),
+    valid_to: MoreThanOrEqual(new Date()),
+  },
+});
+
+
+
+if(promo){
+  const {usage_limit, per_user_limit, used_count,discount_type , discount_value} = promo;
+
+  if( used_count > usage_limit){
+    throw new BadRequestException('Sorry this promocode has reached the limit!')
+  }
+
+
+    const numOfUsedPromocodeforUser:number = await this.bookingRepo.count({
+      where:{
+        user:currentUser,
+        promo_code
+      }
+    });
+    if(numOfUsedPromocodeforUser > per_user_limit){
+          throw new BadRequestException('Sorry, You have reached the promocode usage limit!')
+    }
+
+    if(discount_type=="percentage"){
+      roomPrice = roomPrice*(1-discount_value/100);
+    }else{
+      roomPrice = roomPrice-discount_value;
+    }
+
+    // update the promocode usage_count
+     promo.used_count += 1;
+  await  this.promocodeRepo.save(promo);
+
+}
 
   // create the booking 
+  const booking = this.bookingRepo.create({
+    start_time,
+    end_time,
+    price:roomPrice,
+    promo_code: promo?.code,
+    date,
+    weekday,
+    room,
+    user: { id: currentUser.id }
+  });
 
+    // update the satuts 
+  if(booking){
+    booking.status=BookingStatus.CONFIRMED; 
+  }else{
+        throw new BadRequestException('Sorry, something bad happend while saving the booking!')
+
+  }
   // save it
-  //this.bookingRepo.save(booking)
-    return 'vdfv' ;
-  }
-
-
-
-  findAll() {
-    return `This action returns all booking`;
-  }
-
-  findOne(id: number) {
-    return `This action returns a #${id} booking`;
-  }
-
-  update(id: number, updateBookingDto: UpdateBookingDto) {
-    return `This action updates a #${id} booking`;
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} booking`;
+    return this.bookingRepo.save(booking) ;
   }
 
 
@@ -163,4 +219,23 @@ console.log('checking the overlaps passed!');
     }
     console.log('booking limit passed!')
   }
+
+  
+  findAll() {
+    return `This action returns all booking`;
+  }
+
+  findOne(id: number) {
+    return `This action returns a #${id} booking`;
+  }
+
+  update(id: number, updateBookingDto: UpdateBookingDto) {
+    return `This action updates a #${id} booking`;
+  }
+
+  remove(id: number) {
+    return `This action removes a #${id} booking`;
+  }
+
+
 }
