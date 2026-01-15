@@ -88,9 +88,7 @@ async create(createRoomDto: CreateRoomDto): Promise<Room> {
       };
     }
 
-    const workingHours =
-      await this.workingHoursService.create(workingHoursObject);
-
+    const workingHours = await this.workingHoursService.create(workingHoursObject);
     savedRoom.working_hours = workingHours;
   }
 

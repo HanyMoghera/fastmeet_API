@@ -22,11 +22,11 @@ export class Booking {
   @PrimaryGeneratedColumn()
   id: number;
 
- @Column('time')
-    start_time: string;
+ @Column()
+    start_time: number;
 
-  @Column('time')
-    end_time: string;
+  @Column()
+    end_time: number;
 
   @Column({
     type: 'enum',

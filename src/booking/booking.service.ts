@@ -2,14 +2,14 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { UpdateBookingDto } from './dto/update-booking.dto';
 import { User } from 'src/users/entities/user.entity';
-import { LessThanOrEqual, MoreThanOrEqual, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { Booking, BookingStatus } from './entities/booking.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Room } from 'src/rooms/entities/room.entity';
 import { SettingsService } from 'src/settings/settings.service';
 import { HolidaysService } from 'src/holidays/holidays.service';
 import { Promocode } from 'src/promocode/entities/promocode.entity';
-import { PromocodeService } from 'src/promocode/promocode.service';
+
 
 @Injectable()
 export class BookingService {
@@ -28,201 +28,160 @@ export class BookingService {
 
     private readonly holidayService: HolidaysService,
 
-    private readonly promocodeService: PromocodeService,
-
-
   ){}
 
+async create(createBookingDto: CreateBookingDto, currentUser: User) {
 
-async  create(createBookingDto: CreateBookingDto ,currentUser: User){
-
-  if(!currentUser){
-    throw new BadRequestException('Please login first to be alble to book a room!')
+  if (!currentUser) {
+    throw new BadRequestException('Please login first to book a room!');
   }
 
-  // get the input
-  const {
-    start_time,
-    end_time,
-    weekday,
-    promo_code,
-    date,
-    roomId
-  } = createBookingDto
+  const { start_time, end_time, weekday, promo_code, date, roomId } = createBookingDto;
 
-  // check if there is a room with this ID 
-   const room = await this.roomRepo.findOne({
-   where: { id: +roomId },
-   relations: ['working_hours'],
- });
+  // get the room
+  const room = await this.roomRepo.findOne({
+    where: { id: +roomId },
+    relations: ['working_hours'],
+  });
+  if (!room) {
+    throw new NotFoundException(`No room found with ID: ${roomId}`);
+  }
 
-    if(!room){
-       throw new NotFoundException(`there is no room with this ID: ${roomId}`);
-     }
+  // Convert times to minutes
+  const newStart = this.convertTimeToMinutes(start_time);
+  const newEnd = this.convertTimeToMinutes(end_time);
 
-console.log("pass the room")
+  if (newEnd <= newStart) {
+    throw new BadRequestException('End time must be after start time');
+  }
 
+  const duration = newEnd - newStart;
+  if (duration < 30 || duration > 240) {
+    throw new BadRequestException('Duration must be between 30 minutes and 4 hours');
+  }
 
- const [startTime, startPeriod] = start_time.split(' ');
-const [endTime, endPeriod] = end_time.split(' ');
+  // Check user booking limit per day. 
+  const bookingsCount = await this.bookingRepo
+    .createQueryBuilder('booking')
+    .where('booking.userId = :userId', { userId: currentUser.id })
+    .andWhere('booking.date = :date', { date })
+    .getCount();
 
-let [startHours, startMinutes] = startTime.split(':').map(Number);
-let [endHours, endMinutes] = endTime.split(':').map(Number);
+  const maxLimit = await this.settingsService.getBookingMaxNumberPerUser('max_active_bookings_per_user_per_day');
+  if (bookingsCount >= maxLimit) {
+    throw new BadRequestException('You have exceeded the maximum number of bookings for today');
+  }
 
-if (startPeriod.toLowerCase() === 'pm' && startHours !== 12) startHours += 12;
-if (startPeriod.toLowerCase() === 'am' && startHours === 12) startHours = 0;
-
-if (endPeriod.toLowerCase() === 'pm' && endHours !== 12) endHours += 12;
-if (endPeriod.toLowerCase() === 'am' && endHours === 12) endHours = 0;
-
-const startTimeInMinutes = startHours * 60 + startMinutes;
-const endTimeInMinutes = endHours * 60 + endMinutes;
-
-if (endTimeInMinutes <= startTimeInMinutes) {
-  throw new BadRequestException('End time must be after start time');
-}
-
-const duration = endTimeInMinutes - startTimeInMinutes;
-
-if (!(duration >= 30 && duration <= 240)) {
-  throw new BadRequestException(
-    'Please enter a valid duration between 30 minutes and 4 hours'
-  );
-}
-console.log("pass the duration!")
-
-// check the number of the booking per user! 
-await this.getUserBookings(currentUser, date);
-
-// cehck the hollydays first! 
+  // Check holidays
 const holidays = await this.holidayService.findAll();
+// will just return ex'2026-10-25' user input. 
+const normalize = (d: string) => new Date(d).toISOString().split('T')[0];
 
-if(holidays.count>0){
-  holidays.holidays.map((val)=>{
-    if(date === val.date){
-      throw new BadRequestException(`Sorry this ${weekday} on ${date} is a holliday! no bookings!`)
-    }
+// I used (for of) to check if the date the user wanna book in is one of the holiday dates or not. 
+for (const h of holidays.holidays) {
+  if (normalize(h.date) === normalize(date)) {
+    throw new BadRequestException(`Sorry, ${weekday} on ${date} is a holiday`);
+  }
+}
+
+// Check overlapping bookings directly in DB
+const overlappingBooking = await this.bookingRepo
+  .createQueryBuilder('booking')
+  .where('booking.roomId = :roomId', { roomId: room.id })
+  .andWhere('booking.date = :date', { date })
+  .andWhere('booking.start_time < :newEnd AND booking.end_time > :newStart', { 
+    newStart, 
+    newEnd 
   })
+  .getOne();
+
+if (overlappingBooking) {
+  throw new BadRequestException('The selected time overlaps with an existing booking');
 }
-  console.log('Hollidays passed!'); 
 
-// check the availiability of the time slot  working hours 
 
-//get the the whole booking for this room in this date 
-const bookingsForaDay = await this.bookingRepo.find({where:{room ,date}});
-
-if(bookingsForaDay.length){
-   const isOverlap = bookingsForaDay.some( (val) =>
-      start_time < val.end_time && end_time > val.start_time
-  );
-
-  if (isOverlap) {
-    throw new BadRequestException(
-      'The selected time overlaps with an existing booking!'
-    );
+  // Calculate room price
+  let roomPrice: number = await this.settingsService.getHourlyPrice('hour_price_global');
+  if (!roomPrice) {
+    throw new BadRequestException('No room price found at the moment!');
   }
 
-}
-console.log('checking the overlaps passed!'); 
+  // Apply promo code if exists
+  if (promo_code) {
+    const promo = await this.promocodeRepo
+      .createQueryBuilder('promo')
+      .where('promo.code = :code', { code: promo_code })
+      .andWhere('promo.valid_from <= :now', { now: new Date() })
+      .andWhere('promo.valid_to >= :now', { now: new Date() })
+      .getOne();
 
+    if (!promo) throw new BadRequestException('Invalid or expired promo code');
 
-  //Promocodes 
-  // get the promocode and check the validity "date"
-
-  // caculate the room price 
-
-  let roomPrice:number = await this.settingsService.getHourlyPrice('hour_price_global');
-
-  if(!roomPrice){
-      throw new BadRequestException('Sorry, there is no room price at the moment!')
-  }
-
-
-const promo = await this.promocodeRepo.findOne({
-  where: {
-    code:promo_code,
-    valid_from: LessThanOrEqual(new Date()),
-    valid_to: MoreThanOrEqual(new Date()),
-  },
-});
-
-
-
-if(promo){
-  const {usage_limit, per_user_limit, used_count,discount_type , discount_value} = promo;
-
-  if( used_count > usage_limit){
-    throw new BadRequestException('Sorry this promocode has reached the limit!')
-  }
-
-
-    const numOfUsedPromocodeforUser:number = await this.bookingRepo.count({
-      where:{
-        user:currentUser,
-        promo_code
-      }
-    });
-    if(numOfUsedPromocodeforUser > per_user_limit){
-          throw new BadRequestException('Sorry, You have reached the promocode usage limit!')
+    if (promo.used_count >= promo.usage_limit) {
+      throw new BadRequestException('Promo code has reached its usage limit');
     }
 
-    if(discount_type=="percentage"){
-      roomPrice = roomPrice*(1-discount_value/100);
-    }else{
-      roomPrice = roomPrice-discount_value;
+    const userUsage = await this.bookingRepo
+      .createQueryBuilder('booking')
+      .where('booking.userId = :userId', { userId: currentUser.id })
+      .andWhere('booking.promo_code = :code', { code: promo_code })
+      .getCount();
+
+    if (userUsage >= promo.per_user_limit) {
+      throw new BadRequestException('You have reached the promo code usage limit');
     }
 
-    // update the promocode usage_count
-     promo.used_count += 1;
-  await  this.promocodeRepo.save(promo);
+    if (promo.discount_type === 'percentage') {
+      roomPrice *= 1 - promo.discount_value / 100;
+    } else {
+      roomPrice -= promo.discount_value;
+    }
 
-}
+    // increment promo usage
+    promo.used_count += 1;
+    await this.promocodeRepo.save(promo);
+  }
 
-  // create the booking 
+  // Create and save booking
   const booking = this.bookingRepo.create({
-    start_time,
-    end_time,
-    price:roomPrice,
-    promo_code: promo?.code,
+   start_time:newStart,
+   end_time:newEnd,
     date,
     weekday,
     room,
-    user: { id: currentUser.id }
+    user: { id: currentUser.id },
+    price: roomPrice,
+    promo_code: promo_code || undefined,
+    status: BookingStatus.CONFIRMED,
   });
 
-    // update the satuts 
-  if(booking){
-    booking.status=BookingStatus.CONFIRMED; 
-  }else{
-        throw new BadRequestException('Sorry, something bad happend while saving the booking!')
-
-  }
-  // save it
-    return this.bookingRepo.save(booking) ;
-  }
+  return this.bookingRepo.save(booking);
+}
 
 
-  // get the bookings number per user
-  async getUserBookings(currentUser: User , date:string){
-    // check the existence of the user and get its data 
-    const bookingsNumber = await this.bookingRepo.count({
-      where:{
-        user:currentUser,
-        date
-      }
-    });
-   // check the max num of booking for the user per day 
-    const maxUserBookingLimit =await this.settingsService.getBookingMaxNumberPerUser("max_active_bookings_per_user_per_day");
+// Convert "hh:mm AM/PM" to total minutes
+// eg "04:30 am" 
+private convertTimeToMinutes(timeStr: string): number {
+  if (!timeStr) throw new BadRequestException('Invalid time provided');
 
-    if(bookingsNumber >= maxUserBookingLimit){
-          throw new BadRequestException('Sorry you have exceeded the number of booking for today!')
-    }
-    console.log('booking limit passed!')
-  }
+  const parts = timeStr.trim().split(' ');
+  const time = parts[0];
+  const period = parts[1]?.toLowerCase(); // ? => to check first if it is not undefine then appy the next function to avoide the app crach.
 
-  
+  let [hours, minutes] = time.split(':').map(Number); // .map(Number) to cast the strings to numbers and map cz it is an arry.  
+
+  // to get the all in 24h sys not 12h  
+
+  if (period === 'pm' && hours !== 12) hours += 12; 
+  if (period === 'am' && hours === 12) hours = 0;
+
+  return hours * 60 + minutes;
+}
+
+
+
   findAll() {
-    return `This action returns all booking`;
+    return this.bookingRepo.find();
   }
 
   findOne(id: number) {
@@ -233,8 +192,13 @@ if(promo){
     return `This action updates a #${id} booking`;
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} booking`;
+  async removeAll() {
+    const bookings =await this.findAll()
+
+    if(!bookings){
+      throw new BadRequestException('Sorry, no bookings!')
+    }
+    return this.bookingRepo.remove(bookings);
   }
 
 
