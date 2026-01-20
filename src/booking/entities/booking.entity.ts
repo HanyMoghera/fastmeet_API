@@ -59,4 +59,9 @@ export class Booking {
 
   @UpdateDateColumn()
   updated_at: Date;
+  
+  // saving a idempotency Key 
+  @Column({ unique: true })
+  idempotencyKey: string;
+
 }

@@ -31,7 +31,25 @@ export class BookingService {
 
   ){}
 
-async create(createBookingDto: CreateBookingDto, currentUser: User) {
+async create(
+  createBookingDto: CreateBookingDto, 
+  currentUser: User, 
+  idempotencyKey: string
+) {
+
+    if (!idempotencyKey) {
+    throw new BadRequestException('Idempotency key is required');
+  }
+
+  // Check if booking with this key already exists
+  const existingBooking = await this.bookingRepo.findOne({
+    where: { idempotencyKey },
+  });
+
+  if (existingBooking) {
+    // Return existing booking instead of creating a new one
+    return existingBooking;
+  }
 
   if (!currentUser) {
     throw new BadRequestException('Please login first to book a room!');
@@ -171,6 +189,7 @@ if (overlappingBooking) {
     price: roomPrice,
     promo_code: promo_code || undefined,
     status: BookingStatus.CONFIRMED,
+    idempotencyKey,
   });
 
   return this.bookingRepo.save(booking);

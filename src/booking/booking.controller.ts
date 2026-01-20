@@ -1,9 +1,10 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete , Headers} from '@nestjs/common';
 import { BookingService } from './booking.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { UpdateBookingDto } from './dto/update-booking.dto';
 import { CurrentUser } from 'src/decorators/current-user.decorator';
 import { User } from 'src/users/entities/user.entity';
+
 
 @Controller('booking')
 export class BookingController {
@@ -12,9 +13,10 @@ export class BookingController {
   @Post()
   create(
     @Body() createBookingDto: CreateBookingDto,
-    @CurrentUser() currentUser: User
+    @CurrentUser() currentUser: User,
+    @Headers('idempotency-key') idempotencyKey: string,
   ) {
-    return this.bookingService.create(createBookingDto, currentUser);
+    return this.bookingService.create(createBookingDto, currentUser ,idempotencyKey);
   }
 
   @Get()
