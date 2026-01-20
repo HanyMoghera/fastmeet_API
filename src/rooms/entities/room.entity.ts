@@ -1,5 +1,6 @@
 import {
     Column,
+    DeleteDateColumn,
     Entity,
     Index,
     JoinTable,
@@ -50,12 +51,15 @@ export class Room {
 
     // define the relationship between room and working hours 
     @OneToMany(()=>WorkingHour, (working_hours)=> working_hours.room)
-    working_hours:WorkingHour[]; // list of a lists 
+    working_hours:WorkingHour[]; // a list of working hours with different dates. 
 
     // wetween the room and the booking. 
     @OneToMany(()=> Booking, (bookings)=> bookings.room)
     bookings:Booking
 
+
+    @DeleteDateColumn()
+    deletedAt: Date;
 }
 
 

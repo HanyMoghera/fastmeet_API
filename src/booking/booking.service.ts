@@ -9,6 +9,7 @@ import { Room } from 'src/rooms/entities/room.entity';
 import { SettingsService } from 'src/settings/settings.service';
 import { HolidaysService } from 'src/holidays/holidays.service';
 import { Promocode } from 'src/promocode/entities/promocode.entity';
+import { WorkingHour } from 'src/working_hours/entities/working_hour.entity';
 
 
 @Injectable()
@@ -47,9 +48,26 @@ async create(createBookingDto: CreateBookingDto, currentUser: User) {
     throw new NotFoundException(`No room found with ID: ${roomId}`);
   }
 
-  // Convert times to minutes
-  const newStart = this.convertTimeToMinutes(start_time);
-  const newEnd = this.convertTimeToMinutes(end_time);
+ // Convert times to minutes
+const newStart = this.convertTimeToMinutes(start_time); 
+const newEnd = this.convertTimeToMinutes(end_time); 
+
+const workingHoursArray: WorkingHour[] = room.working_hours; 
+
+// Get the working hours for the given date
+const workingHours = workingHoursArray.find(wh => wh.date === date);
+
+if (!workingHours) {
+  throw new BadRequestException('No working hours set for this room on this date');
+}
+
+const startWorkingTime = workingHours.start_time; // 810
+const endWorkingTime = workingHours.end_time;     // 1080
+
+// Check if the entered period is outside working hours
+if (newStart < startWorkingTime || newEnd > endWorkingTime) {
+  throw new BadRequestException('Sorry, this entered period is not available');
+}
 
   if (newEnd <= newStart) {
     throw new BadRequestException('End time must be after start time');
@@ -158,10 +176,8 @@ if (overlappingBooking) {
   return this.bookingRepo.save(booking);
 }
 
-
-// Convert "hh:mm AM/PM" to total minutes
-// eg "04:30 am" 
-private convertTimeToMinutes(timeStr: string): number {
+// Convert "hh:mm AM/PM" to total minutes // eg "04:30 am" 
+public convertTimeToMinutes(timeStr: string): number {
   if (!timeStr) throw new BadRequestException('Invalid time provided');
 
   const parts = timeStr.trim().split(' ');
@@ -171,25 +187,39 @@ private convertTimeToMinutes(timeStr: string): number {
   let [hours, minutes] = time.split(':').map(Number); // .map(Number) to cast the strings to numbers and map cz it is an arry.  
 
   // to get the all in 24h sys not 12h  
-
   if (period === 'pm' && hours !== 12) hours += 12; 
   if (period === 'am' && hours === 12) hours = 0;
 
   return hours * 60 + minutes;
 }
 
-
-
-  findAll() {
-    return this.bookingRepo.find();
+  async findAll() {
+    const allBookings =await this.bookingRepo.find();
+    if(!allBookings.length || allBookings === undefined){
+      throw new BadRequestException('Sorry, there is no bookings exists!')
+    }
+    return allBookings;
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} booking`;
+ async findOne(id: number) {
+    const booking = await this.bookingRepo.findOne({where:{id}});
+
+     if(!booking){
+      throw new BadRequestException(`Sorry, there is no booking with this ID ${id} exists!`)
+    }
+
+    return booking;
   }
 
-  update(id: number, updateBookingDto: UpdateBookingDto) {
-    return `This action updates a #${id} booking`;
+  async update(id: number, updateBookingDto: UpdateBookingDto) {
+    // get the booking 
+    const booking = await this.findOne(id);
+
+    // update it 
+    Object.assign(booking, updateBookingDto);
+
+    // save it 
+    return this.bookingRepo.save(booking);
   }
 
   async removeAll() {
@@ -201,5 +231,9 @@ private convertTimeToMinutes(timeStr: string): number {
     return this.bookingRepo.remove(bookings);
   }
 
+  async removeOne(id:number){
+        const booking = await this.findOne(id);
+        return this.bookingRepo.remove(booking);
+  }
 
 }

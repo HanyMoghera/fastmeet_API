@@ -1,44 +1,32 @@
-import { IsArray, IsDateString, IsEnum, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
-import { Type } from 'class-transformer';
-import { Weekday }from '../entities/working_hour.entity'
-// import { Room } from 'src/rooms/entities/room.entity';
+import { IsEnum, IsNumber, IsString, Matches } from 'class-validator';
+import { Weekday } from '../entities/working_hour.entity';
 
-export class WorkingHourItemDto {
+export class CreateWorkingHoursDto {
 
-    @IsEnum(Weekday)
-    weekday: Weekday;
+  @IsEnum(Weekday)
+  weekday: Weekday;
 
-    @IsString()
-    start_time: string; 
+  // Accepts: 1:40 pm, 01:40 pm, 12:30 AM
+  @IsString()
+  @Matches(/^(0?[1-9]|1[0-2]):[0-5][0-9]\s?(am|pm)$/i, {
+    message: 'start_time must be in 12-hour format like "1:40 pm" or "01:40 pm"',
+  })
+  start_time: string;
 
-    @IsString()
-    end_time: string; 
+  // Accepts: 1:40 pm, 01:40 pm, 12:30 AM
+  @IsString()
+  @Matches(/^(0?[1-9]|1[0-2]):[0-5][0-9]\s?(am|pm)$/i, {
+    message: 'end_time must be in 12-hour format like "12:30 am"',
+  })
+  end_time: string;
 
+  // Strict YYYY-MM-DD only
+  @IsString()
+  @Matches(/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/, {
+    message: 'date must be in format YYYY-MM-DD',
+  })
+  date: string;
 
-    @IsDateString()
-    date: string;
-
-}
-
-// for more than one working hours 
-export class CreateWorkingHoursDto{
-    
-   @IsNumber()
-   roomId: number;
-
-
-   @IsArray()
-   @ValidateNested({each: true})
-   @Type(()=> WorkingHourItemDto)
-   working_hours:WorkingHourItemDto[];
-
-}
-
-
-// for just one working hours 
-export class CreateWorkingHourDto extends WorkingHourItemDto {
   @IsNumber()
   roomId: number;
 }
-
-

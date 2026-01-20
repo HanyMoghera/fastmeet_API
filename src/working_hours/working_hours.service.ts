@@ -1,10 +1,11 @@
-import {Injectable, NotFoundException } from '@nestjs/common';
-import { CreateWorkingHourDto, CreateWorkingHoursDto, WorkingHourItemDto } from './dto/create-working_hour.dto';
+import {BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { CreateWorkingHoursDto } from './dto/create-working_hour.dto';
 import { UpdateWorkingHourDto } from './dto/update-working_hour.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { WorkingHour } from './entities/working_hour.entity';
 import { Repository } from 'typeorm';
 import { Room } from 'src/rooms/entities/room.entity';
+import { BookingService } from 'src/booking/booking.service';
 
 @Injectable()
 export class WorkingHoursService {
@@ -14,25 +15,16 @@ export class WorkingHoursService {
     private readonly repo: Repository<WorkingHour>,
 
     @InjectRepository(Room)
-    private readonly RoomRepo: Repository<WorkingHour>
+    private readonly RoomRepo: Repository<Room>,
+
+    private readonly bookingService: BookingService
   ){}
 
-async create(
-  dto: CreateWorkingHourDto | CreateWorkingHoursDto,
-): Promise<WorkingHour[]> {
 
+async create(dto: CreateWorkingHoursDto){
   const roomId = dto.roomId;
-  let workingHoursData: WorkingHourItemDto[];
 
-  // normalize input (single or multiple)
-  if (Array.isArray((dto as CreateWorkingHoursDto).working_hours)) {
-    workingHoursData = (dto as CreateWorkingHoursDto).working_hours;
-  } else {
-    const { weekday, start_time, end_time, date } =
-      dto as CreateWorkingHourDto;
-
-    workingHoursData = [{ weekday, start_time, end_time, date }];
-  }
+  let { weekday, start_time , end_time, date } = dto;
 
   // check room existence
   const room = await this.RoomRepo.findOne({ where: { id: roomId } });
@@ -40,19 +32,33 @@ async create(
     throw new NotFoundException(`There is no Room with this ID: ${roomId}`);
   }
 
-  // create entities
-  const workingHours = workingHoursData.map((wh) =>
-    this.repo.create({
-      ...wh,
-      room,
-    }),
-  );
 
-  return this.repo.save(workingHours);
+  // 2. Count working hours for this room
+  const workingHoursCount = await this.repo.count({
+    where: {
+       room: { id: roomId },
+       date: date
+      },
+  });
+
+  if (workingHoursCount > 0) {
+    throw new BadRequestException(
+      `Room with ID ${roomId} already has working hours`
+    );
+  }
+
+const startTime =this.bookingService.convertTimeToMinutes(start_time);
+const endTime =this.bookingService.convertTimeToMinutes(end_time);
+
+const workingHours:WorkingHour = await this.repo.create({weekday, start_time:startTime, end_time:endTime, date, room});
+
+if(!workingHours){
+  throw new BadRequestException('Sorry, something bad happened while creating tge working hour!')
+}
+ return this.repo.save(workingHours);
 }
 
-
-  async findAll() {
+async findAll() {
     const workingHours = await this.repo.find();
     const count = workingHours.length;
 

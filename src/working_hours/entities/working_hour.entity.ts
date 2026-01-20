@@ -30,10 +30,10 @@ export class WorkingHour{
     weekday: Weekday;
 
     @Column()
-    start_time:string;
+    start_time:number;
 
     @Column()
-    end_time:string;
+    end_time:number;
 
     @Column({type: 'date'})
     date:string;

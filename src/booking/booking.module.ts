@@ -6,7 +6,6 @@ import { Booking } from './entities/booking.entity';
 import { User } from 'src/users/entities/user.entity';
 import { Room } from 'src/rooms/entities/room.entity';
 import { SettingsModule } from 'src/settings/settings.module';
-import { HolidaysService } from 'src/holidays/holidays.service';
 import { HolidaysModule } from 'src/holidays/holidays.module';
 import { PromocodeModule } from 'src/promocode/promocode.module';
 import { Promocode } from 'src/promocode/entities/promocode.entity';
@@ -20,5 +19,6 @@ import { Promocode } from 'src/promocode/entities/promocode.entity';
   ],
   controllers: [BookingController],
   providers: [BookingService],
+  exports:[BookingService]
 })
 export class BookingModule {}

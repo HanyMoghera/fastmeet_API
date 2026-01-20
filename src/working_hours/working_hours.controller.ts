@@ -1,8 +1,7 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
 import { WorkingHoursService } from './working_hours.service';
-import { CreateWorkingHourDto, CreateWorkingHoursDto } from './dto/create-working_hour.dto';
+import { CreateWorkingHoursDto } from './dto/create-working_hour.dto';
 import { UpdateWorkingHourDto } from './dto/update-working_hour.dto';
-import { Serialize } from 'src/interceptors/serialization.interceptor';
 
 
 @Controller('working-hours')
@@ -10,7 +9,7 @@ export class WorkingHoursController {
   constructor(private readonly workingHoursService: WorkingHoursService) {}
 
   @Post()
-  create(@Body() body: CreateWorkingHourDto | CreateWorkingHoursDto) {
+  create(@Body() body:CreateWorkingHoursDto) {
     return this.workingHoursService.create(body);
   }
 

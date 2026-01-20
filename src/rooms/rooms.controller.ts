@@ -41,7 +41,7 @@ export class RoomsController {
   @Get(':id/availability')
     getAvailability( 
       @Param('id') id: string, 
-      @Query('date')date: string){
+      @Query('date') date: string){
         return this.roomsService.getAvailability(+id, date)
     }
 
