@@ -5,6 +5,7 @@ import {
   ManyToOne,
   CreateDateColumn,
   UpdateDateColumn,
+  VersionColumn,
 } from 'typeorm';
 
 import { Room } from '../../rooms/entities/room.entity';
@@ -63,5 +64,8 @@ export class Booking {
   // saving a idempotency Key 
   @Column({ unique: true })
   idempotencyKey: string;
+
+  @VersionColumn()
+  version: number;
 
 }

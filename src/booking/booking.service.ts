@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { UpdateBookingDto } from './dto/update-booking.dto';
 import { User } from 'src/users/entities/user.entity';
@@ -47,12 +47,6 @@ async create(
     await queryRunner.startTransaction();
 
     const roomId = Number(createBookingDto.roomId);
-
-    // Advisory lock per room
-    await queryRunner.query(
-      'SELECT pg_advisory_lock($1)',
-      [roomId],
-    );
 
     // Idempotency check (inside transaction)
     const existingBooking = await queryRunner.manager.findOne(Booking, {
@@ -186,6 +180,7 @@ async create(
       await queryRunner.manager.save(promo);
     }
 
+    // Create booking with versioning (Optimistic Locking)
     const booking = queryRunner.manager.create(Booking, {
       start_time: newStart,
       end_time: newEnd,
@@ -197,13 +192,22 @@ async create(
       promo_code: promo_code || undefined,
       status: BookingStatus.CONFIRMED,
       idempotencyKey,
+      version: 1, // initial version
     });
 
     let savedBooking: Booking;
 
     try {
-      savedBooking = await queryRunner.manager.save(booking);
+      savedBooking = await queryRunner.manager.save(booking, {
+        reload: false, // prevent automatic reload
+      });
     } catch (e) {
+      // Handle optimistic locking conflict
+      if (e.name === 'OptimisticLockVersionMismatchError') {
+        throw new ConflictException(
+          'This booking was updated by another process. Please try again.'
+        );
+      }
       // Exclusion constraint violation
       if (e.code === '23P01') {
         throw new BadRequestException(
@@ -220,13 +224,10 @@ async create(
     await queryRunner.rollbackTransaction();
     throw error;
   } finally {
-    await queryRunner.query(
-      'SELECT pg_advisory_unlock($1)',
-      [Number(createBookingDto.roomId)],
-    );
     await queryRunner.release();
   }
 }
+
 
   public convertTimeToMinutes(timeStr: string): number {
     if (!timeStr) {
