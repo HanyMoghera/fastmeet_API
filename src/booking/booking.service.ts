@@ -27,222 +27,206 @@ export class BookingService {
     private readonly dataSource: DataSource,
   ) {}
 
-  async create(
-    createBookingDto: CreateBookingDto,
-    currentUser: User,
-    idempotencyKey: string,
-  ) {
-    if (!idempotencyKey) {
-      throw new BadRequestException('Idempotency key is required');
+async create(
+  createBookingDto: CreateBookingDto,
+  currentUser: User,
+  idempotencyKey: string,
+) {
+  if (!idempotencyKey) {
+    throw new BadRequestException('Idempotency key is required');
+  }
+
+  if (!currentUser) {
+    throw new BadRequestException('Please login first to book a room!');
+  }
+
+  const queryRunner = this.dataSource.createQueryRunner();
+  await queryRunner.connect();
+
+  try {
+    await queryRunner.startTransaction();
+
+    const roomId = Number(createBookingDto.roomId);
+
+    // Advisory lock per room
+    await queryRunner.query(
+      'SELECT pg_advisory_lock($1)',
+      [roomId],
+    );
+
+    // Idempotency check (inside transaction)
+    const existingBooking = await queryRunner.manager.findOne(Booking, {
+      where: { idempotencyKey },
+    });
+
+    if (existingBooking) {
+      return existingBooking;
     }
 
-    if (!currentUser) {
-      throw new BadRequestException('Please login first to book a room!');
+    const {
+      start_time,
+      end_time,
+      weekday,
+      promo_code,
+      date,
+    } = createBookingDto;
+
+    const room = await queryRunner.manager.findOne(Room, {
+      where: { id: roomId },
+      relations: ['working_hours'],
+    });
+
+    if (!room) {
+      throw new NotFoundException(`No room found with ID: ${roomId}`);
     }
 
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
+    const newStart = this.convertTimeToMinutes(start_time);
+    const newEnd = this.convertTimeToMinutes(end_time);
 
-    try {
-      await queryRunner.startTransaction();
+    if (newEnd <= newStart) {
+      throw new BadRequestException('End time must be after start time');
+    }
 
-      const roomId = Number(createBookingDto.roomId);
+    const duration = newEnd - newStart;
+    if (duration < 30 || duration > 240) {
+      throw new BadRequestException('Duration must be between 30 minutes and 4 hours');
+    }
 
-      // Advisory lock per room (exclusive)
-      await queryRunner.query(
-        'SELECT pg_advisory_lock($1)',
-        [roomId],
+    const workingHours = room.working_hours.find(
+      wh => wh.date === date,
+    );
+
+    if (!workingHours) {
+      throw new BadRequestException('No working hours set for this room on this date');
+    }
+
+    if (
+      newStart < workingHours.start_time ||
+      newEnd > workingHours.end_time
+    ) {
+      throw new BadRequestException('This period is outside working hours');
+    }
+
+    // Holidays check
+    const holidays = await this.holidayService.findAll();
+    const normalize = (d: string) =>
+      new Date(d).toISOString().split('T')[0];
+
+    for (const h of holidays.holidays) {
+      if (normalize(h.date) === normalize(date)) {
+        throw new BadRequestException(
+          `Sorry, ${weekday} on ${date} is a holiday`,
+        );
+      }
+    }
+
+    // User daily booking limit
+    const bookingsCount = await queryRunner.manager
+      .createQueryBuilder(Booking, 'booking')
+      .where('booking.userId = :userId', { userId: currentUser.id })
+      .andWhere('booking.date = :date', { date })
+      .getCount();
+
+    const maxLimit =
+      await this.settingsService.getBookingMaxNumberPerUser(
+        'max_active_bookings_per_user_per_day',
       );
 
-      // Idempotency check inside transaction
-      const existingBooking = await queryRunner.manager.findOne(Booking, {
-        where: { idempotencyKey },
-      });
-
-      if (existingBooking) {
-        await queryRunner.commitTransaction();
-        return existingBooking;
-      }
-
-      const { start_time, end_time, weekday, promo_code, date } =
-        createBookingDto;
-
-      // Get room with working hours
-      const room = await queryRunner.manager.findOne(Room, {
-        where: { id: roomId },
-        relations: ['working_hours'],
-      });
-
-      if (!room) {
-        throw new NotFoundException(`No room found with ID: ${roomId}`);
-      }
-
-      // Convert times to minutes
-      const newStart = this.convertTimeToMinutes(start_time);
-      const newEnd = this.convertTimeToMinutes(end_time);
-
-      if (newEnd <= newStart) {
-        throw new BadRequestException('End time must be after start time');
-      }
-
-      const duration = newEnd - newStart;
-      if (duration < 30 || duration > 240) {
-        throw new BadRequestException(
-          'Duration must be between 30 minutes and 4 hours',
-        );
-      }
-
-      // Check working hours
-      const workingHours = room.working_hours.find(
-        (wh) => wh.date === date,
+    if (bookingsCount >= maxLimit) {
+      throw new BadRequestException(
+        'You have exceeded the maximum number of bookings for today',
       );
+    }
 
-      if (!workingHours) {
-        throw new BadRequestException(
-          'No working hours set for this room on this date',
-        );
-      }
+    // Price calculation
+    let roomPrice = await this.settingsService.getHourlyPrice(
+      'hour_price_global',
+    );
 
-      if (
-        newStart < workingHours.start_time ||
-        newEnd > workingHours.end_time
-      ) {
-        throw new BadRequestException(
-          'This period is outside working hours',
-        );
-      }
+    if (!roomPrice) {
+      throw new BadRequestException('No room price found at the moment');
+    }
 
-      // Check holidays
-      const holidays = await this.holidayService.findAll();
-      const normalize = (d: string) =>
-        new Date(d).toISOString().split('T')[0];
-
-      for (const h of holidays.holidays) {
-        if (normalize(h.date) === normalize(date)) {
-          throw new BadRequestException(
-            `Sorry, ${weekday} on ${date} is a holiday`,
-          );
-        }
-      }
-
-      // User booking limit per day
-      const bookingsCount = await queryRunner.manager
-        .createQueryBuilder(Booking, 'booking')
-        .where('booking.userId = :userId', { userId: currentUser.id })
-        .andWhere('booking.date = :date', { date })
-        .getCount();
-
-      const maxLimit =
-        await this.settingsService.getBookingMaxNumberPerUser(
-          'max_active_bookings_per_user_per_day',
-        );
-
-      if (bookingsCount >= maxLimit) {
-        throw new BadRequestException(
-          'You have exceeded the maximum number of bookings for today',
-        );
-      }
-
-      // Overlapping bookings check
-      const overlappingBooking = await queryRunner.manager
-        .createQueryBuilder(Booking, 'booking')
-        .where('booking.roomId = :roomId', { roomId })
-        .andWhere('booking.date = :date', { date })
-        .andWhere(
-          'booking.start_time < :newEnd AND booking.end_time > :newStart',
-          { newStart, newEnd },
-        )
+    // Promo code
+    if (promo_code) {
+      const promo = await queryRunner.manager
+        .createQueryBuilder(Promocode, 'promo')
+        .where('promo.code = :code', { code: promo_code })
+        .andWhere('promo.valid_from <= :now', { now: new Date() })
+        .andWhere('promo.valid_to >= :now', { now: new Date() })
         .getOne();
 
-      if (overlappingBooking) {
+      if (!promo) {
+        throw new BadRequestException('Invalid or expired promo code');
+      }
+
+      if (promo.used_count >= promo.usage_limit) {
+        throw new BadRequestException('Promo code usage limit reached');
+      }
+
+      const userUsage = await queryRunner.manager
+        .createQueryBuilder(Booking, 'booking')
+        .where('booking.userId = :userId', { userId: currentUser.id })
+        .andWhere('booking.promo_code = :code', { code: promo_code })
+        .getCount();
+
+      if (userUsage >= promo.per_user_limit) {
+        throw new BadRequestException(
+          'You have reached the promo code usage limit',
+        );
+      }
+
+      if (promo.discount_type === 'percentage') {
+        roomPrice *= 1 - promo.discount_value / 100;
+      } else {
+        roomPrice -= promo.discount_value;
+      }
+
+      promo.used_count += 1;
+      await queryRunner.manager.save(promo);
+    }
+
+    const booking = queryRunner.manager.create(Booking, {
+      start_time: newStart,
+      end_time: newEnd,
+      date,
+      weekday,
+      room,
+      user: { id: currentUser.id },
+      price: roomPrice,
+      promo_code: promo_code || undefined,
+      status: BookingStatus.CONFIRMED,
+      idempotencyKey,
+    });
+
+    let savedBooking: Booking;
+
+    try {
+      savedBooking = await queryRunner.manager.save(booking);
+    } catch (e) {
+      // Exclusion constraint violation
+      if (e.code === '23P01') {
         throw new BadRequestException(
           'The selected time overlaps with an existing booking',
         );
       }
-
-      // Calculate price
-      let roomPrice = await this.settingsService.getHourlyPrice(
-        'hour_price_global',
-      );
-
-      if (!roomPrice) {
-        throw new BadRequestException('No room price found at the moment');
-      }
-
-      // Promo code handling
-      if (promo_code) {
-        const promo = await queryRunner.manager
-          .createQueryBuilder(Promocode, 'promo')
-          .where('promo.code = :code', { code: promo_code })
-          .andWhere('promo.valid_from <= :now', { now: new Date() })
-          .andWhere('promo.valid_to >= :now', { now: new Date() })
-          .getOne();
-
-        if (!promo) {
-          throw new BadRequestException('Invalid or expired promo code');
-        }
-
-        if (promo.used_count >= promo.usage_limit) {
-          throw new BadRequestException(
-            'Promo code usage limit reached',
-          );
-        }
-
-        const userUsage = await queryRunner.manager
-          .createQueryBuilder(Booking, 'booking')
-          .where('booking.userId = :userId', {
-            userId: currentUser.id,
-          })
-          .andWhere('booking.promo_code = :code', {
-            code: promo_code,
-          })
-          .getCount();
-
-        if (userUsage >= promo.per_user_limit) {
-          throw new BadRequestException(
-            'You have reached the promo code usage limit',
-          );
-        }
-
-        if (promo.discount_type === 'percentage') {
-          roomPrice *= 1 - promo.discount_value / 100;
-        } else {
-          roomPrice -= promo.discount_value;
-        }
-
-        promo.used_count += 1;
-        await queryRunner.manager.save(promo);
-      }
-
-      // Create booking
-      const booking = queryRunner.manager.create(Booking, {
-        start_time: newStart,
-        end_time: newEnd,
-        date,
-        weekday,
-        room,
-        user: { id: currentUser.id },
-        price: roomPrice,
-        promo_code: promo_code || undefined,
-        status: BookingStatus.CONFIRMED,
-        idempotencyKey,
-      });
-
-      const savedBooking = await queryRunner.manager.save(booking);
-
-      await queryRunner.commitTransaction();
-      return savedBooking;
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.query(
-        'SELECT pg_advisory_unlock($1)',
-        [Number(createBookingDto.roomId)],
-      );
-      await queryRunner.release();
+      throw e;
     }
+
+    await queryRunner.commitTransaction();
+    return savedBooking;
+
+  } catch (error) {
+    await queryRunner.rollbackTransaction();
+    throw error;
+  } finally {
+    await queryRunner.query(
+      'SELECT pg_advisory_unlock($1)',
+      [Number(createBookingDto.roomId)],
+    );
+    await queryRunner.release();
   }
+}
 
   public convertTimeToMinutes(timeStr: string): number {
     if (!timeStr) {

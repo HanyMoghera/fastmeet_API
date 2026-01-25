@@ -47,7 +47,6 @@ export class SettingsService {
 
   async update(key: string, updateSettingDto: UpdateSettingDto) {
     // check if the key exists 
-
     const existingKey =await this.settingsRepo.find({where:{key}});
     if(!existingKey){
       throw new NotFoundException('Sorry there is no such a key!')
