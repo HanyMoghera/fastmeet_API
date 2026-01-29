@@ -5,6 +5,7 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { Expose, Transform } from 'class-transformer';
 
 export enum DiscountType {
   PERCENTAGE = 'percentage',
@@ -29,23 +30,27 @@ export class Promocode {
   discount_value: number;
 
   @Column({ type: 'timestamp' })
+  @Transform(({ value }) => value?.toISOString(), { toPlainOnly: true })
   valid_from: Date;
 
   @Column({ type: 'timestamp' })
+  @Transform(({ value }) => value?.toISOString(), { toPlainOnly: true })
   valid_to: Date;
 
   @Column({ type: 'int', nullable: true })
-  usage_limit: number; // total usage limit for all the users 
+  usage_limit: number;
 
   @Column({ type: 'int', nullable: true })
-  per_user_limit: number;  // total usage limit for one user 
+  per_user_limit: number;
 
   @Column({ type: 'int', default: 0 })
   used_count: number;
 
   @CreateDateColumn()
+  @Transform(({ value }) => value?.toISOString(), { toPlainOnly: true })
   created_at: Date;
 
-  @UpdateDateColumn() 
+  @UpdateDateColumn()
+  @Transform(({ value }) => value?.toISOString(), { toPlainOnly: true })
   updated_at: Date;
 }

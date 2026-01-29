@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { UpdateBookingDto } from './dto/update-booking.dto';
 import { User } from 'src/users/entities/user.entity';
@@ -9,6 +9,7 @@ import { Room } from 'src/rooms/entities/room.entity';
 import { SettingsService } from 'src/settings/settings.service';
 import { HolidaysService } from 'src/holidays/holidays.service';
 import { Promocode } from 'src/promocode/entities/promocode.entity';
+import { dateAnd12hTimeToTimestamp } from '../working_hours/working_hours.service'
 
 @Injectable()
 export class BookingService {
@@ -74,15 +75,16 @@ async create(
       throw new NotFoundException(`No room found with ID: ${roomId}`);
     }
 
-    const newStart = this.convertTimeToMinutes(start_time);
-    const newEnd = this.convertTimeToMinutes(end_time);
+    const newStart = dateAnd12hTimeToTimestamp(date, start_time);
+    const newEnd = dateAnd12hTimeToTimestamp(date, end_time);
 
     if (newEnd <= newStart) {
       throw new BadRequestException('End time must be after start time');
     }
 
-    const duration = newEnd - newStart;
-    if (duration < 30 || duration > 240) {
+    const durationse = newEnd - newStart;
+    const durationMin = durationse / (1000 * 60);
+    if (durationMin < 30 || durationMin > 240) {
       throw new BadRequestException('Duration must be between 30 minutes and 4 hours');
     }
 
@@ -228,23 +230,115 @@ async create(
   }
 }
 
+// cancel booking by the user and with roles the user
+async cancelBooking(id: number) {
+  try {
+    const booking = await this.bookingRepo.findOne({ where: { id } });
 
-  public convertTimeToMinutes(timeStr: string): number {
-    if (!timeStr) {
-      throw new BadRequestException('Invalid time provided');
+    if (!booking) {
+      throw new NotFoundException({
+        message: 'Booking not found',
+        details: `No booking exists with ID ${id}`,
+      });
     }
 
-    const parts = timeStr.trim().split(' ');
-    const time = parts[0];
-    const period = parts[1]?.toLowerCase();
+    if (booking.status === BookingStatus.CANCELLED) {
+      throw new BadRequestException({
+        message: 'Booking already cancelled',
+      });
+    }
 
-    let [hours, minutes] = time.split(':').map(Number);
+    const startTimeMs = booking.start_time; // UTC ms
+    const nowMs = Date.now(); // UTC ms
 
-    if (period === 'pm' && hours !== 12) hours += 12;
-    if (period === 'am' && hours === 12) hours = 0;
+    const diffInMinutes = Math.floor(
+      (startTimeMs - nowMs) / (1000 * 60),
+    );
 
-    return hours * 60 + minutes;
+    if (diffInMinutes <= 0) {
+      throw new BadRequestException({
+        message: 'Booking already started',
+        details: 'You cannot cancel a booking that has already started',
+      });
+    }
+
+    const sixHoursInMinutes = 6 * 60;
+
+    let cancellationFees = 0;
+    let returnedAmount = booking.price;
+
+    if (diffInMinutes < sixHoursInMinutes) {
+      cancellationFees = booking.price * 0.05;
+      returnedAmount = booking.price - cancellationFees;
+    }
+
+    booking.status = BookingStatus.CANCELLED;
+    await this.bookingRepo.save(booking);
+
+    return {
+      success: true,
+      message: 'Booking cancelled successfully',
+      data: {
+        basePrice: booking.price,
+        cancellationFees,
+        returnedAmount,
+        minutesBeforeStart: diffInMinutes,
+      },
+    };
+  } catch (error) {
+    // Re-throw known HTTP exceptions
+    if (
+      error instanceof BadRequestException ||
+      error instanceof NotFoundException
+    ) {
+      throw error;
+    }
+
+    // Unknown / DB / server errors
+    throw new InternalServerErrorException({
+      message: 'Failed to cancel booking',
+      error: error.message,
+    });
   }
+}
+
+// admin overide the booking status 
+async adminUpdateBookingStatus(id: number, newStatus: BookingStatus) {
+  try {
+    const booking = await this.bookingRepo.findOne({ where: { id } });
+
+    if (!booking) {
+      throw new NotFoundException({
+        message: 'Booking not found',
+        details: `No booking exists with ID ${id}`,
+      });
+    }
+
+    // If status is already the same
+    if (booking.status === newStatus) {
+      return {
+        success: true,
+        message: `Booking is already ${newStatus}`,
+      };
+    }
+
+    // Update status
+    booking.status = newStatus;
+    await this.bookingRepo.save(booking);
+
+    return {
+      success: true,
+      message: 'Booking status updated successfully',
+    };
+  } catch (error) {
+    throw new InternalServerErrorException({
+      message: 'Failed to update booking status',
+      error: error.message,
+    });
+  }
+}
+
+
 
   async findAll() {
     const allBookings = await this.bookingRepo.find();
@@ -282,5 +376,21 @@ async create(
   async removeOne(id: number) {
     const booking = await this.findOne(id);
     return this.bookingRepo.remove(booking);
+  }
+    public convertTimeToMinutes(timeStr: string): number {
+    if (!timeStr) {
+      throw new BadRequestException('Invalid time provided');
+    }
+
+    const parts = timeStr.trim().split(' ');
+    const time = parts[0];
+    const period = parts[1]?.toLowerCase();
+
+    let [hours, minutes] = time.split(':').map(Number);
+
+    if (period === 'pm' && hours !== 12) hours += 12;
+    if (period === 'am' && hours === 12) hours = 0;
+
+    return hours * 60 + minutes;
   }
 }

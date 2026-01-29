@@ -180,7 +180,7 @@ async remove(id: number): Promise<void> {
     );
   }
   // soft delete the room
-  await this.roomRepo.softDelete(id);
+  await this.roomRepo.remove(room);
 }
 // This function returns availability data for a specific room and date
 async getAvailability(id: number, date: string) {

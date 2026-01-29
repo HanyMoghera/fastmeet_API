@@ -1,4 +1,4 @@
-import { Expose, Type } from 'class-transformer';
+import { Expose, Type, Transform } from 'class-transformer';
 import { WorkingHoursResponseDto } from '../../working_hours/dto/get-working-hours.dto';
 import { AmenityDto } from '../../amenities/dto/amentity.dto';
 
@@ -19,10 +19,12 @@ export class RoomResponseDto {
   is_active: boolean;
 
   @Expose()
-  created_at: Date;
+  @Transform(({ value }) => value?.toISOString())
+  created_at: string;
 
   @Expose()
-  updated_at: Date;
+  @Transform(({ value }) => value?.toISOString())
+  updated_at: string;
 
   @Expose()
   @Type(() => AmenityDto)

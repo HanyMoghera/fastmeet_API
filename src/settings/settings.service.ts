@@ -45,16 +45,17 @@ export class SettingsService {
     return settings;
   }
 
-  async update(key: string, updateSettingDto: UpdateSettingDto) {
-    // check if the key exists 
-    const existingKey =await this.settingsRepo.find({where:{key}});
-    if(!existingKey){
-      throw new NotFoundException('Sorry there is no such a key!')
+async update(key: string, updateSettingDto: UpdateSettingDto) {
+    const existingKey = await this.settingsRepo.findOneBy({ key });
+    if (!existingKey) {
+        throw new NotFoundException('Sorry there is no such key!');
     }
-    Object.assign(updateSettingDto, existingKey);
+
+    // Update the entity with DTO values
+    Object.assign(existingKey, updateSettingDto);
 
     return this.settingsRepo.save(existingKey);
-  }
+}
 
  async getBookingMaxNumberPerUser(key: string): Promise<number>{
 

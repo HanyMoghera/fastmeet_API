@@ -29,11 +29,11 @@ export class WorkingHour{
     })
     weekday: Weekday;
 
-    @Column()
+    @Column({ type: 'bigint' })
     start_time:number;
 
-    @Column()
-    end_time:number;
+    @Column({ type: 'bigint' })
+    end_time:number ;
 
     @Column({type: 'date'})
     date:string;

@@ -23,11 +23,14 @@ export class Booking {
   @PrimaryGeneratedColumn()
   id: number;
 
- @Column()
-    start_time: number;
+  @Column({ type: 'bigint' })
+  start_time:number;
 
-  @Column()
-    end_time: number;
+  @Column({ type: 'bigint' })
+  end_time:number ;
+
+  @Column({type: 'date'})
+  date:string;
 
   @Column({
     type: 'enum',
@@ -41,9 +44,6 @@ export class Booking {
 
   @Column({ type: 'varchar', nullable: true })
   promo_code: string;
-
-  @Column('date')
-  date: string;
 
   @Column()
   weekday:Weekday;

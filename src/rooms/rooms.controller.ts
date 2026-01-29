@@ -5,13 +5,12 @@ import { UpdateRoomDto } from './dto/update-room.dto';
 import { Serialize } from 'src/interceptors/serialization.interceptor';
 import { RoomResponseDto } from './dto/room.dto';
 
-
+@Serialize(RoomResponseDto)
 @Controller('rooms')
 export class RoomsController {
   constructor(private readonly roomsService: RoomsService) {}
 
 
-  @Serialize(RoomResponseDto)
   @Post()
   create(@Body() createRoomDto: CreateRoomDto) {
     return this.roomsService.create(createRoomDto);
